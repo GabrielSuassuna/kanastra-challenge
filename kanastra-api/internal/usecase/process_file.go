@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"gopkg.in/gomail.v2"
 	"io"
 	"kanastra-api/internal/entity"
 	"kanastra-api/pkg/events"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 )
 
@@ -24,24 +24,27 @@ type FileUpdatedEvent struct {
 }
 
 type ProcessFileUseCase struct {
-	FileRepository  entity.FileRepositoryInterface
-	FileEvent       events.EventInterface
-	EventDispatcher events.EventDispatcherInterface
+	FileRepository   entity.FileRepositoryInterface
+	BilletRepository entity.BilletRepositoryInterface
+	FileEvent        events.EventInterface
+	EventDispatcher  events.EventDispatcherInterface
 }
 
 func NewProcessFileUseCase(
 	fileRepository entity.FileRepositoryInterface,
+	billetRepository entity.BilletRepositoryInterface,
 	fileEvent events.EventInterface,
 	eventDispatcher events.EventDispatcherInterface,
 ) *ProcessFileUseCase {
 	return &ProcessFileUseCase{
-		FileRepository:  fileRepository,
-		FileEvent:       fileEvent,
-		EventDispatcher: eventDispatcher,
+		FileRepository:   fileRepository,
+		BilletRepository: billetRepository,
+		FileEvent:        fileEvent,
+		EventDispatcher:  eventDispatcher,
 	}
 }
 
-func (u *ProcessFileUseCase) Worker(ctx context.Context, dst chan string, src chan []string) {
+func (u *ProcessFileUseCase) Worker(ctx context.Context, dst chan []string, src chan []string) {
 	for {
 		select {
 		case url, ok := <-src: // Checar se o canal está fechado
@@ -49,9 +52,9 @@ func (u *ProcessFileUseCase) Worker(ctx context.Context, dst chan string, src ch
 				return
 			}
 
-			go u.SendEmail(url[0], url[1])
+			go u.CreateBillet(url)
 
-			dst <- url[0]
+			dst <- url
 		case <-ctx.Done(): // Checar se o contexto foi cancelado
 			return
 		}
@@ -59,16 +62,39 @@ func (u *ProcessFileUseCase) Worker(ctx context.Context, dst chan string, src ch
 }
 
 func (u *ProcessFileUseCase) SendEmail(name, email string) {
-	m := gomail.NewMessage()
-	m.SetHeader("From", "alex@example.com")
-	m.SetHeader("To", email)
-	m.SetHeader("Subject", "Sua fatura está pronta!")
-	m.SetBody("text/html", fmt.Sprintf("<h1>Olá %s, sua fatura está pronta!</h1>", name))
+	fmt.Println("Sending email to", name, "at", email)
+}
 
-	d := gomail.NewDialer("smtp.example.com", 587, "user", "123456")
+func (u *ProcessFileUseCase) CreateBillet(url []string) {
+	fmt.Println("Creating billet for", url[0])
 
-	if err := d.DialAndSend(m); err != nil {
+	u.SendEmail(url[0], url[2])
+}
 
+func (u *ProcessFileUseCase) SaveBillet(url []string) {
+	debtAmount, err := strconv.ParseFloat(url[3], 64)
+
+	if err != nil {
+		fmt.Println("Error converting string to float64")
+		fmt.Println(url[3])
+		fmt.Println(err)
+		return
+	}
+
+	billet := entity.NewBillet(url[0], url[1], url[2], url[4], url[5], debtAmount)
+
+	err = u.BilletRepository.Save(billet)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	u.SendEmail(url[0], url[2])
+}
+
+func (u *ProcessFileUseCase) SaveBillets(urls [][]string) {
+	for _, url := range urls {
+		u.SaveBillet(url)
 	}
 }
 
@@ -85,7 +111,7 @@ func (u *ProcessFileUseCase) Execute(input *ProcessFileInputDTO) error {
 
 	// Cria os canais
 	src := make(chan []string)
-	out := make(chan string)
+	out := make(chan []string)
 
 	// Cria o WaitGroup
 	var wg sync.WaitGroup
@@ -109,33 +135,36 @@ func (u *ProcessFileUseCase) Execute(input *ProcessFileInputDTO) error {
 				log.Fatal(err)
 			}
 
-			src <- record // Envia o registro para o canal src
+			src <- record // Envia o registro para o canal src para os workers consumirem
 		}
 		close(src) // Fecha o canal src
 	}()
 
 	// Espera os workers terminarem
 	go func() {
-		wg.Wait()  // Espera os workers terminarem
+		wg.Wait() // Espera os workers terminarem
+
+		fileUpdated, err := u.FileRepository.Update(input.ID)
+
+		if err != nil {
+			return
+		}
+
+		u.FileEvent.SetPayload(FileUpdatedEvent{
+			Message: "process-finished",
+			Data:    *fileUpdated,
+		})
+
+		err = u.EventDispatcher.Dispatch(u.FileEvent)
 		close(out) // Fecha o canal out
 	}()
 
-	// Drena o canal out
-	for _ = range out {
+	billets := make([][]string, 0)
+	for url := range out {
+		billets = append(billets, url)
 	}
 
-	fileUpdated, err := u.FileRepository.Update(input.ID)
-
-	if err != nil {
-		return err
-	}
-
-	u.FileEvent.SetPayload(FileUpdatedEvent{
-		Message: "process-finished",
-		Data:    *fileUpdated,
-	})
-
-	err = u.EventDispatcher.Dispatch(u.FileEvent)
+	go u.SaveBillets(billets)
 
 	if err != nil {
 		return err

@@ -119,7 +119,9 @@ export default function Home() {
                 <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                   {file.name}
                 </Table.Cell>
-                <Table.Cell>{file.created_at}</Table.Cell>
+                <Table.Cell>
+                  {new Date(file.created_at).toLocaleDateString()}
+                </Table.Cell>
                 <Table.Cell>
                   {file.processed ? (
                     <span className="text-green-500">Sim</span>

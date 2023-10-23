@@ -28,8 +28,9 @@ func NewCreateFileUseCase(client *mongo.Client, eventDispatcher events.EventDisp
 
 func NewProcessFileUseCase(client *mongo.Client, eventDispatcher events.EventDispatcherInterface) *usecase.ProcessFileUseCase {
 	fileRepository := database.NewFileRepository(client)
+	billetRepository := database.NewBilletRepository(client)
 	fileEvent := event.NewFileEvent()
-	processFileUseCase := usecase.NewProcessFileUseCase(fileRepository, fileEvent, eventDispatcher)
+	processFileUseCase := usecase.NewProcessFileUseCase(fileRepository, billetRepository, fileEvent, eventDispatcher)
 	return processFileUseCase
 }
 
@@ -41,8 +42,9 @@ func NewGetFilesUseCase(client *mongo.Client) *usecase.GetFilesUseCase {
 
 func NewFileHandler(client *mongo.Client, eventDispatcher events.EventDispatcherInterface) *web.FileHandler {
 	fileRepository := database.NewFileRepository(client)
+	billetRepository := database.NewBilletRepository(client)
 	fileEvent := event.NewFileEvent()
-	fileHandler := web.NewFileHandler(eventDispatcher, fileRepository, fileEvent)
+	fileHandler := web.NewFileHandler(eventDispatcher, fileRepository, billetRepository, fileEvent)
 	return fileHandler
 }
 
@@ -54,6 +56,8 @@ func NewEventsHandler(sseChannel *chan string) *web.EventHandler {
 // wire.go:
 
 var setFileRepositoryDependency = wire.NewSet(database.NewFileRepository, wire.Bind(new(entity.FileRepositoryInterface), new(*database.FileRepository)))
+
+var setBilletRepositoryDependency = wire.NewSet(database.NewBilletRepository, wire.Bind(new(entity.BilletRepositoryInterface), new(*database.BilletRepository)))
 
 var setEventDispatcherDependency = wire.NewSet(events.NewEventDispatcher, event.NewFileEvent, wire.Bind(new(events.EventInterface), new(*event.FileEvent)), wire.Bind(new(events.EventDispatcherInterface), new(*events.EventDispatcher)))
 

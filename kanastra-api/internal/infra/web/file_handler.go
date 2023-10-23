@@ -14,20 +14,23 @@ import (
 )
 
 type FileHandler struct {
-	EventDispatcher events.EventDispatcherInterface
-	FileRepository  entity.FileRepositoryInterface
-	FileEvent       events.EventInterface
+	EventDispatcher  events.EventDispatcherInterface
+	FileRepository   entity.FileRepositoryInterface
+	BilletRepository entity.BilletRepositoryInterface
+	FileEvent        events.EventInterface
 }
 
 func NewFileHandler(
 	eventDispatcher events.EventDispatcherInterface,
 	fileRepository entity.FileRepositoryInterface,
+	billetRepository entity.BilletRepositoryInterface,
 	fileEvent events.EventInterface,
 ) *FileHandler {
 	return &FileHandler{
-		EventDispatcher: eventDispatcher,
-		FileRepository:  fileRepository,
-		FileEvent:       fileEvent,
+		EventDispatcher:  eventDispatcher,
+		FileRepository:   fileRepository,
+		BilletRepository: billetRepository,
+		FileEvent:        fileEvent,
 	}
 }
 
@@ -98,7 +101,7 @@ func (h *FileHandler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	processFileUseCase := usecase.NewProcessFileUseCase(h.FileRepository, h.FileEvent, h.EventDispatcher)
+	processFileUseCase := usecase.NewProcessFileUseCase(h.FileRepository, h.BilletRepository, h.FileEvent, h.EventDispatcher)
 
 	go func() {
 		err = processFileUseCase.Execute(

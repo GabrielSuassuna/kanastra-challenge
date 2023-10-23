@@ -19,6 +19,11 @@ var setFileRepositoryDependency = wire.NewSet(
 	wire.Bind(new(entity.FileRepositoryInterface), new(*database.FileRepository)),
 )
 
+var setBilletRepositoryDependency = wire.NewSet(
+	database.NewBilletRepository,
+	wire.Bind(new(entity.BilletRepositoryInterface), new(*database.BilletRepository)),
+)
+
 var setEventDispatcherDependency = wire.NewSet(
 	events.NewEventDispatcher,
 	event.NewFileEvent,
@@ -43,6 +48,7 @@ func NewCreateFileUseCase(client *mongo.Client, eventDispatcher events.EventDisp
 func NewProcessFileUseCase(client *mongo.Client, eventDispatcher events.EventDispatcherInterface) *usecase.ProcessFileUseCase {
 	wire.Build(
 		setFileRepositoryDependency,
+		setBilletRepositoryDependency,
 		setFileEvent,
 		usecase.NewProcessFileUseCase,
 	)
@@ -60,6 +66,7 @@ func NewGetFilesUseCase(client *mongo.Client) *usecase.GetFilesUseCase {
 func NewFileHandler(client *mongo.Client, eventDispatcher events.EventDispatcherInterface) *web.FileHandler {
 	wire.Build(
 		setFileRepositoryDependency,
+		setBilletRepositoryDependency,
 		setFileEvent,
 		web.NewFileHandler,
 	)

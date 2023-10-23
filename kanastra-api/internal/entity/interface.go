@@ -5,3 +5,7 @@ type FileRepositoryInterface interface {
 	FindAll() ([]File, error)
 	Update(id string) (*File, error)
 }
+
+type BilletRepositoryInterface interface {
+	Save(billet *Billet) error
+}
