@@ -1,0 +1,40 @@
+# Use root/example as user/password credentials
+version: '3.1'
+
+services:
+  front:
+    restart: always
+    build:
+      context: ./kanastra-front
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - api
+
+  api:
+    restart: always
+    build:
+      context: ./kanastra-api
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080
+    depends_on:
+      - mongo
+    networks:
+      - backend
+
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+        - 27017:27017
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

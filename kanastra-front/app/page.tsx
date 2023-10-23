@@ -66,7 +66,7 @@ export default function Home() {
 
   useEffect(() => {
     // opening a connection to the server to begin receiving events from it
-    const eventSource = new EventSource("http://localhost:8090/events");
+    const eventSource = new EventSource("http://localhost:8080/events");
 
     // attaching a handler to receive message events
     eventSource.onmessage = (event) => {
@@ -131,8 +131,8 @@ export default function Home() {
                   {file.processed
                     ? `${
                         Math.abs(
-                          new Date(file.processed_at) -
-                            new Date(file.created_at)
+                          new Date(file.processed_at).getTime() -
+                            new Date(file.created_at).getTime()
                         ) / 1000
                       } segundos`
                     : "-"}
